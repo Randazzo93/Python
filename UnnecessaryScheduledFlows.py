@@ -37,10 +37,13 @@ def pull_postgres_data():
 
     sql = """
             SELECT DISTINCT background_jobs.title,
+                            P.name AS ProjectName, 
                             schedules.name
             FROM background_jobs
                  LEFT JOIN tasks AS task ON background_jobs.correlation_id = task.id
-                 LEFT JOIN subscriptions ON task.obj_id = subscriptions.id AND task.type::text = 'SingleSubscriptionTask'::text
+                 LEFT JOIN flow_runs as flow_t ON task.id = flow_t.task_id
+                 LEFT JOIN flows as flow ON flow_t.flow_id = flow.id
+                 LEFT JOIN hist_projects AS P ON P.project_id = flow.project_id
                  LEFT JOIN _schedules AS schedules ON task.schedule_id = schedules.id
             WHERE CAST(background_jobs.created_at AS DATE) >= current_date - 1
         """
@@ -76,7 +79,7 @@ def merge_data():
                                              )
 
     # Merge graphql data with postgres data to bring through schedule assignment by flow name
-    full_data = flow_normalized_data.merge(pull_postgres_data(), left_on='name', right_on='title')
+    full_data = flow_normalized_data.merge(pull_postgres_data(), left_on=['name','projectName'], right_on=['title', 'projectname'])
 
     # Write to excel to view data
     full_data.to_excel("flows.xlsx")
